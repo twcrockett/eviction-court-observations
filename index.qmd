@@ -1,5 +1,5 @@
 ---
-title: "Summer 2023 Findings"
+title: "Findings"
 title-block-banner: TRUE
 fig-width: 7
 fig-height: 5

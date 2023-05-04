@@ -24,7 +24,7 @@ website:
           text: "Home"
           href: index.html
         - icon: house-door-fill
-          text: "Summer 2023 Findings"
+          text: "Findings"
           href: summer2023.html
         - icon: github
           text: "Github"
