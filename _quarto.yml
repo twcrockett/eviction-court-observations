@@ -5,8 +5,8 @@ project:
 format:
   html:
     theme: www/web_report.scss
-    toc: true
-    toc-depth: 4
+    toc: false
+#    toc-depth: 4
     anchor-sections: false
 website:
   favicon: www/images/CPAL_favicon.ico
@@ -25,7 +25,7 @@ website:
           href: index.html
         - icon: house-door-fill
           text: "Findings"
-          href: summer2023.html
+          href: findings.html
         - icon: github
           text: "Github"
           href: "https://github.com/childpovertyactionlab/"
