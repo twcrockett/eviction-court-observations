@@ -168,6 +168,12 @@ defRepresent <- courtobs %>%
   ungroup(.) %>%
   pivot_wider(names_from = defRep, values_from = count, values_fill = 0)
 
+#eviction reason
+evicReason <- courtobs %>%
+  filter(!is.na(jpCourt)) %>%
+  mutate(evicClean = ifelse(str_detect(evicReason, ","), "Multiple Reasons", evicReason)) %>%
+  group_by(jpCourt, evicClean) %>%
+  summarize(count = n())
 ```
 
 # CONTEXT
