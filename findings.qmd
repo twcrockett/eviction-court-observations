@@ -19,7 +19,8 @@ library(sf)
 library(googlesheets4)
 library(DT)
 
-libDB <- "C:/Users/micha/CPAL Dropbox/"
+#libDB <- "C:/Users/micha/CPAL Dropbox/"
+libDB <- "E:/CPAL Dropbox/"
 
 googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
 
@@ -268,9 +269,8 @@ jpCasesObs %>%
   ggplot(aes(x = "", y = perCases, fill = type)) +
   geom_bar(stat = "identity", width = 1) +
   coord_polar(theta = "y") +
-  theme_cpal() +
+  theme_cpal_print() +
   facet_grid(~court) +
-  scale_fill_cpal(theme = "factor") +
 #  scale_y_continuous(labels = scales::percent) +
   labs(title = "Percent of All Cases Observed")
   
@@ -306,12 +306,10 @@ evicReason %>%
   ggplot(aes(x = "", fill=evicClean, y=perCases)) + 
   geom_bar(stat="identity") +
   coord_polar(theta = "y") +
-  theme_cpal() +
   facet_grid(~jpCourt) +
-  theme_cpal() +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Percent of All Cases Observed") +
-  scale_fill_cpal(theme = "factor")
+  labs(title = "Percent of All Cases Observed")
   
 ```
 
@@ -326,11 +324,10 @@ caseAppear %>%
   ggplot(aes(x = type, y = AppearPer, fill = type)) +
     geom_bar(stat = "identity") +
     facet_grid(~jpCourt) +
-  theme_cpal() +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
   labs(title = "Landlords or their representatives almost always appeared for the hearing, but tenants
 appeared less than half the time.") +
-  scale_fill_cpal(theme = "factor") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -346,10 +343,9 @@ defRepresent %>%
   ggplot(aes(x = legalRep, y = perRep, fill = legalRep)) +
     geom_bar(stat = "identity") +
     facet_grid(~jpCourt) +
-  theme_cpal() +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
   labs(title = "Tenants rarely had legal representation.") +
-  scale_fill_cpal(theme = "factor") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
