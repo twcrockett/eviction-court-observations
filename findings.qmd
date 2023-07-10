@@ -1,8 +1,9 @@
 ---
 title: "Report Context"
 title-block-banner: TRUE
-fig-width: 9
-fig-height: 5
+#fig-width: 9
+#fig-height: 5
+fig-dpi: 64
 warning: FALSE
 error: TRUE
 echo: FALSE
@@ -18,9 +19,11 @@ library(rio)
 library(sf)
 library(googlesheets4)
 library(DT)
+library(grid)
+library(gridExtra)
 
-#libDB <- "C:/Users/micha/CPAL Dropbox/"
-libDB <- "E:/CPAL Dropbox/"
+libDB <- "C:/Users/micha/CPAL Dropbox/"
+#libDB <- "E:/CPAL Dropbox/"
 
 googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
 
@@ -48,10 +51,15 @@ courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_n
          "jpRuled"="the_jp_ruled_in_favor_of",
          "outcomeOther"="if_you_selected_other_please_specify_the_outcome_of_the_case_below",
          "otherNotes"="additional_case_notes"
-)
+) %>%
+  filter(!jpCourt %in% c("5-2", "3-2"),
+         !is.na(jpCourt))
 
 #dallas county evictions dataset
-evictions <- rio::import(paste0(libDB, "Data Library/Dallas County/Eviction Records/Data/Dallas County Eviction Master/EvictionRecords_Master.csv"))
+evictions <- rio::import(paste0(libDB, "Data Library/Dallas County/Eviction Records/Data/Dallas County Eviction Master/EvictionRecords_Master.csv")) %>%
+  mutate(jpCourt = str_remove(court, "Court  ")) %>%
+  filter(!jpCourt %in% c("5-2", "3-2", "NA"))
+
 
 #court observation dates
 startDate <- min(courtobs$observationDate, na.rm = TRUE)
@@ -109,34 +117,22 @@ totObsCases <- courtobs %>%
 #total number of cases scheduled by court in time period of court observations
 obsCourt <- evictions %>%
   filter(appearance_date >= as.Date("2022-11-01") & appearance_date < as.Date("2023-04-20")) %>%
-  group_by(court) %>%
+  filter(jpCourt %in% unique(courtobs$jpCourt)) %>%
+  group_by(jpCourt) %>%
   summarize(totEvic = n()) %>%
-  filter(court %in% c("Court  1-1",
-                     "Court  1-2",
-                     "Court  3-1",
-                     "Court  3-2",
-                     "Court  4-1",
-                     "Court  5-1")) %>%
   ungroup(.)
 
 #total number of cases observed by volunteers in observation period by court
 jpCasesObs <- courtobs %>%
   group_by(jpCourt) %>%
   summarize(obsCases = n()) %>%
-  mutate(perObsCases = obsCases/totObsCases,
-         court = ifelse(jpCourt == "1-1", "Court  1-1",
-                     ifelse(jpCourt == "1-2", "Court  1-2",
-                     ifelse(jpCourt == "3-1", "Court  3-1",
-                     ifelse(jpCourt == "3-2", "Court  3-2",
-                     ifelse(jpCourt == "4-1", "Court  4-1",
-                     ifelse(jpCourt == "5-1", "Court  5-1", "Other"))))))) %>%
+  mutate(perObsCases = obsCases/totObsCases) %>%
   ungroup(.) %>%
   left_join(., obsCourt) %>%
   mutate(perAllCases = obsCases/totEvic)
 
 #cases observed compared to entire county
 jpCasesCty <- jpCasesObs %>%
-  filter(jpCourt %in% c("1-1", "3-1", "5-1")) %>%
   summarize(obsCases = sum(obsCases),
             totEvic = sum(totEvic)) %>%
   mutate(perAllCases = round(obsCases/totEvic, digits = 3))
@@ -144,7 +140,6 @@ jpCasesCty <- jpCasesObs %>%
 #case outcome by party filed in favor of by jp court
 caseOutcome <- courtobs %>%
   filter(!is.na(jpCourt)) %>%
-  filter(jpCourt != "5-2") %>%
   mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
                                           ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
                                                  ifelse(str_detect(jpRuled, "abated"), "Abated",
@@ -157,7 +152,6 @@ caseOutcome <- courtobs %>%
 #case outcome by appearance in court
 outcomeApp <- courtobs %>%
   filter(!is.na(jpCourt)) %>%
-  filter(jpCourt != "5-2") %>%
   filter(defAppear != "Unknown") %>%
   mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
                                           ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
@@ -171,7 +165,6 @@ outcomeApp <- courtobs %>%
 #case outcome by representation for tenant
 outcomeRep <- courtobs %>%
   filter(!is.na(jpCourt)) %>%
-  filter(jpCourt != "5-2") %>%
   filter(defRep == "Yes, an attorney was present for the defendant." | defRep == "No, the defendant did not have additional representation.") %>%
   mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
                                           ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
@@ -258,22 +251,32 @@ From `r startDate` through `r endDate`, `r smuStudents` SMU Law student voluntee
 coverage of all initially scheduled hearings in 1-1, 3-1, and 5-1.
 
 ```{r, Cases Chart}
-jpCasesObs %>%
+#| fig-width: 7
+#| fig-height: 3
+
+plotCases <- jpCasesObs %>%
   filter(!is.na(jpCourt) & obsCases > 1) %>%
-  select(jpCourt, court, perAllCases) %>%
+  select(jpCourt, perAllCases) %>%
   mutate(perAntCases = 1-perAllCases) %>%
   pivot_longer(cols = c("perAllCases", "perAntCases")) %>%
   rename(perCases = value) %>%
   mutate(type = ifelse(name == "perAllCases", "Observed", "Not Observed")) %>%
   select(-name) %>%
   ggplot(aes(x = "", y = perCases, fill = type)) +
-  geom_bar(stat = "identity", width = 1) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste(round(perCases*100, digits = 1), "%"), x = 1.1),
+            position = position_stack(vjust = 0.5),
+            fontface = "bold") +
   coord_polar(theta = "y") +
-  theme_cpal_print() +
-  facet_grid(~court) +
-#  scale_y_continuous(labels = scales::percent) +
-  labs(title = "Percent of All Cases Observed")
-  
+  theme_cpal_map(scale = "discrete") +
+  facet_grid(~jpCourt) +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(title = "Percent of All Cases Observed by JP Court")
+
+grid.arrange(plotCases, cpal_logo_text(), 
+             ncol = 1,
+             heights = c(30, 1))
+
 ```
 
 ```{r, Cases Table}
@@ -301,16 +304,25 @@ jpCasesObs %>%
 ## Across the `r totObsCases` observed cases, we found:
 
 ```{r, Cases by Reason}
-evicReason %>%
+plotReason <- evicReason %>%
   filter(jpCourt != "5-2") %>%
+  mutate(evicClean = factor(evicClean, levels = c("Non-payment of rent", "Violated lease", "Holdover/lease expiration", "Multiple Reasons", "Unknown"))) %>%
   ggplot(aes(x = "", fill=evicClean, y=perCases)) + 
   geom_bar(stat="identity") +
+  geom_text(aes(label = ifelse(perCases >= 0.1, paste(round(perCases*100, digits = 1), "%"), ""), x = 1.0),
+            position = position_stack(vjust = 0.6),
+            fontface = "bold") +
   coord_polar(theta = "y") +
   facet_grid(~jpCourt) +
-  theme_cpal_print() +
-  scale_y_continuous(labels = scales::percent) +
-  labs(title = "Percent of All Cases Observed")
-  
+  labs(title = "Reason for Eviction Case Filing by Court") +
+  theme_cpal_map(scale = "discrete") +
+  facet_grid(~jpCourt) +
+  scale_fill_manual(values = palette_cpal_main)
+
+grid.arrange(plotReason, cpal_logo_text(), 
+             ncol = 1,
+             heights = c(30, 1))
+
 ```
 
 > *The reason for an eviction case might be unknown if a default judgment was awarded to a landlord and the facts of the case were not discussed. Reasons are rounded to the nearest whole number, so totals may not equal 100%.
@@ -320,17 +332,25 @@ pandemic. Eviction cases due to nonpayment of rent might have been remedied had 
 been aware of and able to easily access rent relief programs.
 
 ```{r, Representation for Cases}
-caseAppear %>%
+plotAppear <- caseAppear %>%
   ggplot(aes(x = type, y = AppearPer, fill = type)) +
-    geom_bar(stat = "identity") +
-    facet_grid(~jpCourt) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste(round(AppearPer*100, digits = 1), "%")),
+            position = position_stack(vjust = 0.9),
+            color = "white",
+            fontface = "bold") +
+  facet_grid(~jpCourt) +
   theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = palette_cpal_main) +
   labs(title = "Landlords or their representatives almost always appeared for the hearing, but tenants
 appeared less than half the time.") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+  remove_axis(axis = "x") +
+  remove_ticks()
+
+grid.arrange(plotAppear, cpal_logo_text(), 
+             ncol = 1,
+             heights = c(30, 1))
 ```
 
 > *In fall 2022, volunteers observed in Justice of the Peace Court 1-1. The arrow here shows change from fall 2022 data collection. E.g., in summer 2023, tenants appeared 48% of the time in JP 1-1, but in fall 2022, tenants appeared 59% of the time.
