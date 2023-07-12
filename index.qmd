@@ -21,8 +21,8 @@ library(DT)
 library(grid)
 library(gridExtra)
 
-#libDB <- "C:/Users/micha/CPAL Dropbox/"
-libDB <- "E:/CPAL Dropbox/"
+libDB <- "C:/Users/micha/CPAL Dropbox/"
+#libDB <- "E:/CPAL Dropbox/"
 
 googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
 
@@ -52,13 +52,13 @@ courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_n
          "otherNotes"="additional_case_notes"
 ) %>%
   filter(!jpCourt %in% c("5-2", "3-2", "2-1"),
-         !is.na(jpCourt))
+         !is.na(jpCourt),
+         observationDate <= as.Date("2023-04-20"))
 
 #dallas county evictions dataset
 evictions <- rio::import(paste0(libDB, "Data Library/Dallas County/Eviction Records/Data/Dallas County Eviction Master/EvictionRecords_Master.csv")) %>%
   mutate(jpCourt = str_remove(court, "Court  ")) %>%
   filter(!jpCourt %in% c("5-2", "3-2", "NA"))
-
 
 #court observation dates
 startDate <- min(courtobs$observationDate, na.rm = TRUE)
@@ -147,7 +147,17 @@ caseOutcome <- courtobs %>%
   group_by(jpCourt, outcomeParty) %>%
   summarize(count = n()) %>%
   mutate(perOutcome = count/sum(count)) %>%
-  ungroup(.)
+  ungroup(.) %>%
+  group_by(outcomeParty) %>%
+  group_map(~ .x %>%
+          janitor::adorn_totals(),.keep = T) %>% 
+  bind_rows() %>%
+  mutate(test = lag(outcomeParty),
+         outcomeParty = ifelse(str_detect(outcomeParty, "Other|Dismissed|Abated|Ruled|Unknown"), outcomeParty, test)) %>%
+  select(-test) %>%
+  group_by(jpCourt) %>%
+  mutate(perOutcome = count/sum(count)) %>%
+  ungroup()
 
 #case outcome by appearance in court
 outcomeApp <- courtobs %>%
@@ -184,6 +194,7 @@ defAppear <- courtobs %>%
   filter(count > 1) %>%
   ungroup(.) %>%
   pivot_wider(names_from = defAppear, values_from = count, values_fill = 0) %>%
+  janitor::adorn_totals() %>%
   mutate(AppearPer = Yes/(Yes+No),
          type = "Tenant (Defendant) Appeared for Hearing")
 
@@ -195,6 +206,7 @@ plaAppear <- courtobs %>%
   filter(count > 1) %>%
   ungroup(.) %>%
   pivot_wider(names_from = plaintiffDesignee, values_from = count, values_fill = 0) %>%
+  janitor::adorn_totals() %>%
   mutate(AppearPer = Yes/(Yes+No),
          type = "Landlord (Plaintiff Appeared for Hearing")
 
@@ -219,7 +231,17 @@ defRepresent <- courtobs %>%
   group_by(jpCourt, legalRep) %>%
   summarize(count = n()) %>%
   mutate(perRep = count/sum(count)) %>%
-  ungroup(.)
+  ungroup(.) %>%
+  group_by(legalRep) %>%
+  group_map(~ .x %>%
+          janitor::adorn_totals(),.keep = T) %>% 
+  bind_rows() %>%
+  mutate(test = lag(legalRep),
+         legalRep = ifelse(str_detect(legalRep, "tenant"), legalRep, test)) %>%
+  select(-test) %>%
+  group_by(jpCourt) %>%
+  mutate(perRep = count/sum(count)) %>%
+  ungroup()
 
 # notice to vacate 
 ntv <- courtobs %>%
@@ -227,12 +249,34 @@ ntv <- courtobs %>%
   group_by(jpCourt, noticeVacate) %>%
   summarize(count = n()) %>%
   mutate(perntv = count/sum(count)) %>%
-  ungroup(.)
+  ungroup(.) %>%
+  group_by(noticeVacate) %>%
+  group_map(~ .x %>%
+          janitor::adorn_totals(),.keep = T) %>% 
+  bind_rows() %>%
+  mutate(test = lag(noticeVacate),
+         noticeVacate = ifelse(str_detect(noticeVacate, "Yes|No|Unknown"), noticeVacate, test)) %>%
+  select(-test) %>%
+  group_by(jpCourt) %>%
+  mutate(perntv = count/sum(count)) %>%
+  ungroup()
+
 
 # average hearing time
 hearingtime <- courtobs %>%
-  group_by(observationDate, observer) %>%
-  arrange(timeStamp)
+  mutate(dockLength = docketEnd-docketStart) %>%
+  group_by(jpCourt, observationDate) %>%
+  summarize(CasesObs = n(),
+            AvgDockLength = mean(dockLength)) %>%
+  ungroup() %>%
+  group_by(jpCourt) %>%
+  summarize(CasesObs = sum(CasesObs),
+            SumDockLength = as.numeric(sum(AvgDockLength))) %>%
+  ungroup(.) %>%
+  janitor::adorn_totals() %>%
+  mutate(AvgCaseLength = SumDockLength/CasesObs) %>%
+  select(-SumDockLength)
+  
 
 #eviction reason
 totReason <- courtobs %>%
@@ -302,7 +346,7 @@ has been ongoing since, with the purpose of **(1)** improving local understandin
 tenants and landlords upstream of an eviction hearing. Observation first began in Dallas County Justice
 of the Peace Court 1-1, expanded to Dallas County Justice of the Peace Courts 3-1 and 5-1 in 2022, and has continued to expand in 2023.
 
-# COURT OBSERVATION PROTOCOL
+# OBSERVATION PROTOCOL
 
 The court observation project is powered by volunteer observers who attend eviction dockets in-person,
 take notes as eviction cases are heard, and then enter the data digitally for CPAL analysis. Since late
@@ -315,12 +359,11 @@ During docket observations, volunteers take notes on cases heard using a paper t
 the data afterwards into a Google Form created and managed by CPAL. Before analysis and reporting,
 CPAL reviews and cleans the data, as needed.
 
-# SUMMER 2023 FINDINGS
+# FINDINGS
 
 From `r format(startDate, "%B %d, %Y")` through `r format(endDate, "%B %d, %Y")`, `r smuStudents` SMU Law student volunteers observed
-`r formattable::comma(totObsCases, digits = 0)` cases: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
-3-1, and `r formattable::comma(jp51, digits = 0)` in Justice of the Peace Court 5-1. The `r formattable::comma(totObsCases, digits = 0)` observed cases represent `r paste0(jpCasesCty$perAllCases*100, "%") `
-coverage of all initially scheduled hearings in 1-1, 3-1, and 5-1.
+**`r formattable::comma(totObsCases, digits = 0)` cases**: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
+3-1, and `r formattable::comma(jp51, digits = 0)` in Justice of the Peace Court 5-1. The `r formattable::comma(totObsCases, digits = 0)` observed cases represent **`r paste0(jpCasesCty$perAllCases*100, "%")`coverage** of all initially scheduled hearings in 1-1, 3-1, and 5-1.
 
 ```{r, Cases Chart}
 #| fig-height: 3
@@ -341,37 +384,36 @@ plotCases <- jpCasesObs %>%
   coord_polar(theta = "y") +
   theme_cpal_map(scale = "discrete") +
   facet_grid(~jpCourt) +
-  scale_fill_manual(values = palette_cpal_main) +
-  labs(title = "Percent of All Cases Observed by JP Court")
+  scale_fill_manual(values = palette_cpal_main)
 
-cpal_plot(plotCases, 
+cpal_plot(zeroGrob(),
+          cpal_title("Percent of All Cases Observed by JP Court"),
+          plotCases, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(30, 1))
+          heights = c(1, 3, 30, 2))
 
 ```
 
 ```{r, Cases Table}
 jpCasesObs %>%
+    mutate(obsCases = as.character(formattable::comma(obsCases, digits = 0)),
+         totEvic = as.character(formattable::comma(totEvic, digits = 0))) %>%
   select(jpCourt, obsCases, totEvic) %>%
   pivot_longer(cols = -jpCourt, names_to = "type") %>%
   pivot_wider(names_from = jpCourt, values_from = value) %>%
-  mutate(type = ifelse(type == "obsCases", "CASES OBSERVED",
-                       ifelse(type == "totEvic", "SCHEDULED HEARINGS*", "ERROR"))) %>%
+  mutate(type = ifelse(type == "obsCases", "Cases Observed",
+                       ifelse(type == "totEvic", "Scheduled Hearings*", "ERROR"))) %>%
   datatable(options = list(paging = FALSE,
                            searching = FALSE,
                            info = FALSE
                            ),
             rownames = FALSE,
             colnames = c("", "1-1", "1-2", "3-1", "4-1", "5-1", "Total")) %>%
-  formatCurrency(c("1-1", "1-2", "3-1","4-1", "5-1", "Total"),
-                 interval = 3,
-                 mark = ",",
-                 currency = "",
-                 digits = 0) %>%
   formatStyle(columns = c("type"), fontWeight = 'bold', `text-align` = 'left') %>%
   formatStyle(columns = colnames(.), fontFamily = "Poppins")
 ```
+
 
 > *The scheduled hearings indicator was calculated based on the hearing date set at the time of the eviction filing. If a hearing date was subsequently rescheduled for a date later than August 5, then the case is still included here in the ‘scheduled hearings’ count. Some scheduled hearings may have been dismissed in advance of the docket, so ‘coverage’ here is likely an underrepresentation of cases observed relative to the number of cases heard during a docket.
 
@@ -397,9 +439,10 @@ cpal_plot(zeroGrob(),
           plotReason, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 
 ```
+
 
 > *The reason for an eviction case might be unknown if a default judgment was awarded to a landlord and the facts of the case were not discussed. Reasons are rounded to the nearest whole number, so totals may not equal 100%.
 
@@ -432,7 +475,7 @@ cpal_plot(zeroGrob(),
           plotAppear, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 ```
 
 > *In fall 2022, volunteers observed in Justice of the Peace Court 1-1. The arrow here shows change from fall 2022 data collection. E.g., in summer 2023, tenants appeared 48% of the time in JP 1-1, but in fall 2022, tenants appeared 59% of the time.
@@ -462,7 +505,7 @@ cpal_plot(zeroGrob(),
           plotDef, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 ```
 
 > *In Spring 2023 in JP 1-1, tenants had legal representation XX% of the time.
@@ -473,8 +516,7 @@ supports, like rent relief.
 
 ```{r, notice to vacate}
 plotntv <- ntv %>%
-  filter(jpCourt != "5-2",
-         noticeVacate == "Yes") %>%
+  filter(noticeVacate == "Yes") %>%
   ggplot(aes(x = noticeVacate, y = perntv)) +
     geom_bar(stat = "identity",
              fill = "#008097") +
@@ -499,18 +541,34 @@ cpal_plot(zeroGrob(),
           plotntv, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 
 ```
 
-> *In Spring 2023 in JP 1-1, a Notice to Vacate was confirmed XX% of the time.
+> *In Spring 2023 in JP 1-1, a Notice to Vacate was confirmed 35% of the time.
 
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Unless a lease agreement states otherwise, Texas law requires a landlord to give a renter at least three days to move out, and the landlord must provide this notice (called a Notice to Vacate) in writing. An eviction cannot be filed in court before providing a Notice to Vacate. If a Notice to Vacate was not properly administered, then the renter may have recourse to have the case dismissed. If the Notice to Vacate is not confirmed during an eviction hearing, then there may be a missed opportunity to dismiss the eviction suit.
 
-**TABLE OF AVERAGE HEARING TIMES**
+```{r, Average Hearing Time}
+hearingtime %>%
+  mutate(CasesObs = as.character(formattable::comma(CasesObs, digits = 0)),
+         AvgCaseLength = as.character(round(AvgCaseLength, digits = 1))) %>%
+  select(jpCourt, CasesObs, AvgCaseLength) %>%
+  pivot_longer(cols = -jpCourt, names_to = "type") %>%
+  pivot_wider(names_from = jpCourt, values_from = value) %>%
+  mutate(type = ifelse(type == "CasesObs", "Cases Observed",
+                       ifelse(type == "AvgCaseLength", "Length of Case (Minutes)", "ERROR"))) %>%
+  datatable(options = list(paging = FALSE,
+                           searching = FALSE,
+                           info = FALSE
+                           ),
+            rownames = FALSE,
+            colnames = c("", "1-1", "1-2", "3-1", "4-1", "5-1", "Total")) %>%
+  formatStyle(columns = c("type"), fontWeight = 'bold', `text-align` = 'left') %>%
+  formatStyle(columns = colnames(.), fontFamily = "Poppins")
+```
 
-> Average hearing length calculated by (1) counting the number of cases observed in each docket, including default judgments, (2) calculating the total time of the docket (end time - start time), (3) calculating the average length of each hearing by dividing docket time by number of cases observed, and then (4) calculating a weighted average across all observed dockets. Because not all cases in a single docket may have been
-observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
+> Average hearing length calculated by (1) counting the number of cases observed in each docket, including default judgments, (2) calculating the total time of the docket (end time - start time), (3) calculating the average length of each hearing by dividing docket time by number of cases observed, and then (4) calculating a weighted average across all observed dockets. Because not all cases in a single docket may have been observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
 
 ```{r, eviction outcome}
 #| fig-height: 3
@@ -525,17 +583,15 @@ plotOutcome <- caseOutcome %>%
   coord_polar(theta = "y") +
   facet_grid(~jpCourt) +
   theme_cpal_map(scale = "discrete") +
-  labs(title = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in
-favor of the tenant in YY% of cases.") %>%
     scale_fill_manual(values = palette_cpal_main)
 
 cpal_plot(zeroGrob(),
-          cpal_title(string = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in favor of the tenant in YY% of cases.",
+          cpal_title(string = "Across all observed cases, the judge ruled in favor of the landlord in 58% of cases and in favor of the tenant in 5% of cases.",
                      width = 75),
           plotOutcome, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 ```
 
 > Outcomes are rounded to the nearest whole number, so totals may not equal 100%.
@@ -572,7 +628,7 @@ appear (across all observations).",
           plotOutAp, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 ```
 
 ## When tenants had legal representation, cases were decided in favor of the landlord 7% of the time.
@@ -601,7 +657,7 @@ cpal_plot(zeroGrob(),
           plotRep, 
           cpal_logo_text(), 
           ncol = 1,
-          heights = c(1, 3, 30, 1))
+          heights = c(1, 3, 30, 2))
 ```
 
 # ABOUT CPAL
