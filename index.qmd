@@ -18,7 +18,8 @@ library(rio)
 library(sf)
 library(googlesheets4)
 
-libDB <- "C:/Users/micha/CPAL Dropbox/"
+#libDB <- "C:/Users/micha/CPAL Dropbox/"
+libDB <- "E:/CPAL Dropbox/"
 
 courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_nRGc64W2OsSjyX9iCS_LkcsG9087HNTuk",
                                sheet = "Form Responses 1") %>%

@@ -1,9 +1,8 @@
 ---
 title: "Report Context"
 title-block-banner: TRUE
-#fig-width: 9
-#fig-height: 5
-fig-dpi: 64
+fig-dpi: 300
+fig-width: 7
 warning: FALSE
 error: TRUE
 echo: FALSE
@@ -22,8 +21,8 @@ library(DT)
 library(grid)
 library(gridExtra)
 
-libDB <- "C:/Users/micha/CPAL Dropbox/"
-#libDB <- "E:/CPAL Dropbox/"
+#libDB <- "C:/Users/micha/CPAL Dropbox/"
+libDB <- "E:/CPAL Dropbox/"
 
 googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
 
@@ -251,7 +250,6 @@ From `r startDate` through `r endDate`, `r smuStudents` SMU Law student voluntee
 coverage of all initially scheduled hearings in 1-1, 3-1, and 5-1.
 
 ```{r, Cases Chart}
-#| fig-width: 7
 #| fig-height: 3
 
 plotCases <- jpCasesObs %>%
@@ -264,7 +262,7 @@ plotCases <- jpCasesObs %>%
   select(-name) %>%
   ggplot(aes(x = "", y = perCases, fill = type)) +
   geom_bar(stat = "identity") +
-  geom_text(aes(label = paste(round(perCases*100, digits = 1), "%"), x = 1.1),
+  geom_text(aes(label = ifelse(perCases >= 0.15, paste0(round(perCases*100, digits = 0), "%"), ""), x = 1.1),
             position = position_stack(vjust = 0.5),
             fontface = "bold") +
   coord_polar(theta = "y") +
@@ -273,9 +271,10 @@ plotCases <- jpCasesObs %>%
   scale_fill_manual(values = palette_cpal_main) +
   labs(title = "Percent of All Cases Observed by JP Court")
 
-grid.arrange(plotCases, cpal_logo_text(), 
-             ncol = 1,
-             heights = c(30, 1))
+cpal_plot(plotCases, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(30, 1))
 
 ```
 
@@ -304,13 +303,13 @@ jpCasesObs %>%
 ## Across the `r totObsCases` observed cases, we found:
 
 ```{r, Cases by Reason}
+#| fig-height: 3
 plotReason <- evicReason %>%
-  filter(jpCourt != "5-2") %>%
   mutate(evicClean = factor(evicClean, levels = c("Non-payment of rent", "Violated lease", "Holdover/lease expiration", "Multiple Reasons", "Unknown"))) %>%
   ggplot(aes(x = "", fill=evicClean, y=perCases)) + 
   geom_bar(stat="identity") +
-  geom_text(aes(label = ifelse(perCases >= 0.1, paste(round(perCases*100, digits = 1), "%"), ""), x = 1.0),
-            position = position_stack(vjust = 0.6),
+  geom_text(aes(label = ifelse(perCases >= 0.15, paste0(round(perCases*100, digits = 0), "%"), ""), x = 1.1),
+            position = position_stack(vjust = 0.5),
             fontface = "bold") +
   coord_polar(theta = "y") +
   facet_grid(~jpCourt) +
@@ -319,9 +318,10 @@ plotReason <- evicReason %>%
   facet_grid(~jpCourt) +
   scale_fill_manual(values = palette_cpal_main)
 
-grid.arrange(plotReason, cpal_logo_text(), 
-             ncol = 1,
-             heights = c(30, 1))
+cpal_plot(plotReason, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(30, 1))
 
 ```
 
@@ -335,7 +335,7 @@ been aware of and able to easily access rent relief programs.
 plotAppear <- caseAppear %>%
   ggplot(aes(x = type, y = AppearPer, fill = type)) +
   geom_bar(stat = "identity") +
-  geom_text(aes(label = paste(round(AppearPer*100, digits = 1), "%")),
+  geom_text(aes(label = paste0(round(AppearPer*100, digits = 0), "%")),
             position = position_stack(vjust = 0.9),
             color = "white",
             fontface = "bold") +
@@ -343,14 +343,17 @@ plotAppear <- caseAppear %>%
   theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_manual(values = palette_cpal_main) +
-  labs(title = "Landlords or their representatives almost always appeared for the hearing, but tenants
-appeared less than half the time.") +
+  labs(x = "",
+       y = "") +
   remove_axis(axis = "x") +
   remove_ticks()
 
-grid.arrange(plotAppear, cpal_logo_text(), 
-             ncol = 1,
-             heights = c(30, 1))
+cpal_plot(cpal_title(string = "Landlords or their representatives almost always appeared for the hearing, but tenants appeared less than half the time.",
+                     width = 75),
+          plotAppear, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 ```
 
 > *In fall 2022, volunteers observed in Justice of the Peace Court 1-1. The arrow here shows change from fall 2022 data collection. E.g., in summer 2023, tenants appeared 48% of the time in JP 1-1, but in fall 2022, tenants appeared 59% of the time.
@@ -358,18 +361,28 @@ grid.arrange(plotAppear, cpal_logo_text(),
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: When a tenant does not appear for an eviction hearing, a default judgment is usually awarded to the landlord, without consideration of the facts of the case. Tenants may not appear in court because they must go to work, lack transportation, are unclear about how eviction cases proceed, or have already determined to move out.
 
 ```{r, Legal Representation Tenants}
-defRepresent %>%
-  filter(jpCourt != "5-2") %>%
+plotDef <- defRepresent %>%
   ggplot(aes(x = legalRep, y = perRep, fill = legalRep)) +
-    geom_bar(stat = "identity") +
-    facet_grid(~jpCourt) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(round(perRep*100, digits = 0), "%")),
+            position = position_stack(vjust = 0.9),
+            color = "white",
+            fontface = "bold") +
+  facet_grid(~jpCourt) +
   theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Tenants rarely had legal representation.") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+    scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "") +
+  remove_axis(axis = "x") +
+  remove_ticks()
 
+cpal_plot(cpal_title(string = "Tenants rarely had legal representation.",
+                     width = 75),
+          plotDef, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 ```
 
 > *In Spring 2023 in JP 1-1, tenants had legal representation XX% of the time.
@@ -379,20 +392,33 @@ and are not assigned a public defender to represent them in court. As a result, 
 supports, like rent relief.
 
 ```{r, notice to vacate}
-ntv %>%
+plotntv <- ntv %>%
   filter(jpCourt != "5-2",
          noticeVacate == "Yes") %>%
   ggplot(aes(x = noticeVacate, y = perntv)) +
     geom_bar(stat = "identity",
              fill = "#008097") +
+    geom_text(aes(label = paste0(round(perntv*100, digits = 0), "%")),
+            position = position_stack(vjust = 0.9),
+            color = "white",
+            fontface = "bold") +
+
     facet_grid(~jpCourt) +
-  theme_cpal() +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Tenants rarely had legal representation.") +
-  scale_fill_cpal(theme = "factor") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+#  labs(title = "Tenants rarely had legal representation.") +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "") +
+  remove_axis(axis = "x") +
+  remove_ticks()
+
+cpal_plot(cpal_title(string = "Tenants rarely had legal representation.",
+                     width = 75),
+          plotntv, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 
 ```
 
@@ -406,18 +432,28 @@ ntv %>%
 observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
 
 ```{r, eviction outcome}
-caseOutcome %>%
+#| fig-height: 3
+
+plotOutcome <- caseOutcome %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant", "Other", "Unknown"))) %>%
   ggplot(aes(x = "", fill=outcomeParty, y=perOutcome)) + 
   geom_bar(stat="identity") +
+  geom_text(aes(label = ifelse(perOutcome >= 0.15, paste0(round(perOutcome*100, digits = 0), "%"), ""), x = 1.1),
+            position = position_stack(vjust = 0.5),
+            fontface = "bold") +
   coord_polar(theta = "y") +
-  theme_cpal() +
   facet_grid(~jpCourt) +
-  theme_cpal() +
-  scale_y_continuous(labels = scales::percent) +
+  theme_cpal_map(scale = "discrete") +
   labs(title = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in
-favor of the tenant in YY% of cases.") +
-  scale_fill_cpal(theme = "factor")
+favor of the tenant in YY% of cases.") %>%
+    scale_fill_manual(values = palette_cpal_main)
 
+cpal_plot(cpal_title(string = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in favor of the tenant in YY% of cases.",
+                     width = 75),
+          plotOutcome, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 ```
 
 > Outcomes are rounded to the nearest whole number, so totals may not equal 100%.
@@ -431,33 +467,52 @@ favor of the tenant in YY% of cases.") +
 ## However, appearing in court and having legal representation matters for outcomes.When tenants appeared for their hearings, cases were decided in favor of the landlord 57% of the time.
 
 ```{r, outcomes with appearance}
-outcomeApp %>%
+plotOutAp <- outcomeApp %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant", "Other", "Unknown"))) %>%
   ggplot(aes(x = defAppear, fill=outcomeParty, y=perOutcome)) + 
-  geom_bar(stat="identity", width = 0.5) +
-  theme_cpal() +
-  theme_cpal() +
+  geom_bar(stat="identity") +
+#  geom_text(aes(label = paste0(round(perOutcome*100, digits = 0), "%")),
+#                fontface = "bold") +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Case outcomes when tenant/defendant appeared versus when tenant/defendant did not
-appear (across all observations).") +
-  scale_fill_cpal(theme = "factor") +
-  coord_flip()
+  coord_flip() +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "")
 
+cpal_plot(cpal_title(string = "Case outcomes when tenant/defendant appeared versus when tenant/defendant did not
+appear (across all observations).",
+                     width = 75),
+          plotOutAp, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 ```
 
 ## When tenants had legal representation, cases were decided in favor of the landlord 10% of the time.
 
 ```{r, outcomes with representation}
-outcomeRep %>%
+plotRep <- outcomeRep %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant", "Other", "Unknown")),
+         defRep = ifelse(str_detect(defRep, "Yes"), "Yes", "No")) %>%
   ggplot(aes(x = defRep, fill=outcomeParty, y=perOutcome)) + 
-  geom_bar(stat="identity", width = 0.5) +
-  theme_cpal() +
-  theme_cpal() +
+  geom_bar(stat="identity") +
+#  geom_text(aes(label = paste0(round(perOutcome*100, digits = 0), "%")),
+#                fontface = "bold") +
+  theme_cpal_print() +
   scale_y_continuous(labels = scales::percent) +
-  labs(title = "Case outcomes when tenant/defendant had legal representation versus when
-tenant/defendant did not have legal representation (across all observations)") +
-  scale_fill_cpal(theme = "factor") +
-  coord_flip()
+  coord_flip() +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "")
 
+cpal_plot(cpal_title(string = "Case outcomes when tenant/defendant had legal representation versus when
+tenant/defendant did not have legal representation (across all observations).",
+                     width = 75),
+          plotRep, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(3, 30, 1))
 ```
 
 # ABOUT CPAL
