@@ -1,12 +1,12 @@
 project:
   type: website
   output-dir: "docs"
-  title: "Dallas Court Observation Project."
+  title: ""
 format:
   html:
     theme: www/web_report.scss
-    toc: false
-#    toc-depth: 4
+    toc: true
+    toc-depth: 1
     anchor-sections: false
 website:
   favicon: www/images/CPAL_favicon.ico
@@ -23,9 +23,6 @@ website:
         - icon: house-door-fill
           text: "Home"
           href: index.html
-        - icon: house-door-fill
-          text: "Findings"
-          href: findings.html
         - icon: github
           text: "Github"
           href: "https://github.com/childpovertyactionlab/"

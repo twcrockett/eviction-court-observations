@@ -1,8 +1,8 @@
 ---
-title: "Findings"
+title: "Dallas County Eviction Court Observation"
 title-block-banner: TRUE
+fig-dpi: 300
 fig-width: 7
-fig-height: 5
 warning: FALSE
 error: TRUE
 echo: FALSE
@@ -17,9 +17,14 @@ library(tidyverse)
 library(rio)
 library(sf)
 library(googlesheets4)
+library(DT)
+library(grid)
+library(gridExtra)
 
 #libDB <- "C:/Users/micha/CPAL Dropbox/"
 libDB <- "E:/CPAL Dropbox/"
+
+googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
 
 courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_nRGc64W2OsSjyX9iCS_LkcsG9087HNTuk",
                                sheet = "Form Responses 1") %>%
@@ -45,10 +50,15 @@ courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_n
          "jpRuled"="the_jp_ruled_in_favor_of",
          "outcomeOther"="if_you_selected_other_please_specify_the_outcome_of_the_case_below",
          "otherNotes"="additional_case_notes"
-)
+) %>%
+  filter(!jpCourt %in% c("5-2", "3-2", "2-1"),
+         !is.na(jpCourt))
 
 #dallas county evictions dataset
-evictions <- rio::import(paste0(libDB, "Data Library/Dallas County/Eviction Records/Data/Dallas County Eviction Master/EvictionRecords_Master.csv"))
+evictions <- rio::import(paste0(libDB, "Data Library/Dallas County/Eviction Records/Data/Dallas County Eviction Master/EvictionRecords_Master.csv")) %>%
+  mutate(jpCourt = str_remove(court, "Court  ")) %>%
+  filter(!jpCourt %in% c("5-2", "3-2", "NA"))
+
 
 #court observation dates
 startDate <- min(courtobs$observationDate, na.rm = TRUE)
@@ -106,34 +116,23 @@ totObsCases <- courtobs %>%
 #total number of cases scheduled by court in time period of court observations
 obsCourt <- evictions %>%
   filter(appearance_date >= as.Date("2022-11-01") & appearance_date < as.Date("2023-04-20")) %>%
-  group_by(court) %>%
+  filter(jpCourt %in% unique(courtobs$jpCourt)) %>%
+  group_by(jpCourt) %>%
   summarize(totEvic = n()) %>%
-  filter(court %in% c("Court  1-1",
-                     "Court  1-2",
-                     "Court  3-1",
-                     "Court  3-2",
-                     "Court  4-1",
-                     "Court  5-1")) %>%
   ungroup(.)
 
 #total number of cases observed by volunteers in observation period by court
 jpCasesObs <- courtobs %>%
   group_by(jpCourt) %>%
   summarize(obsCases = n()) %>%
-  mutate(perObsCases = obsCases/totObsCases,
-         court = ifelse(jpCourt == "1-1", "Court  1-1",
-                     ifelse(jpCourt == "1-2", "Court  1-2",
-                     ifelse(jpCourt == "3-1", "Court  3-1",
-                     ifelse(jpCourt == "3-2", "Court  3-2",
-                     ifelse(jpCourt == "4-1", "Court  4-1",
-                     ifelse(jpCourt == "5-1", "Court  5-1", "Other"))))))) %>%
+  mutate(perObsCases = obsCases/totObsCases) %>%
   ungroup(.) %>%
   left_join(., obsCourt) %>%
+  janitor::adorn_totals() %>%
   mutate(perAllCases = obsCases/totEvic)
 
 #cases observed compared to entire county
 jpCasesCty <- jpCasesObs %>%
-  filter(jpCourt %in% c("1-1", "3-1", "5-1")) %>%
   summarize(obsCases = sum(obsCases),
             totEvic = sum(totEvic)) %>%
   mutate(perAllCases = round(obsCases/totEvic, digits = 3))
@@ -141,14 +140,65 @@ jpCasesCty <- jpCasesObs %>%
 #case outcome by party filed in favor of by jp court
 caseOutcome <- courtobs %>%
   filter(!is.na(jpCourt)) %>%
-  mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Plaintiff",
-                                          ifelse(str_detect(jpRuled, "Defendant"), "Defendant", "Other"))) %>%
+  mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
+                                          ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
+                                                 ifelse(str_detect(jpRuled, "abated"), "Abated",
+                                                        ifelse(str_detect(jpRuled, "dismissed"), "Dismissed", jpRuled))))) %>%
   group_by(jpCourt, outcomeParty) %>%
   summarize(count = n()) %>%
-  pivot_wider(names_from = outcomeParty, values_from = count, values_fill = 0, names_prefix = "result") %>%
+  mutate(perOutcome = count/sum(count)) %>%
+  ungroup(.)
+
+#case outcome by appearance in court
+outcomeApp <- courtobs %>%
+  filter(!is.na(jpCourt)) %>%
+  filter(defAppear != "Unknown") %>%
+  mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
+                                          ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
+                                                 ifelse(str_detect(jpRuled, "abated"), "Abated",
+                                                        ifelse(str_detect(jpRuled, "dismissed"), "Dismissed", jpRuled))))) %>%
+  group_by(defAppear, outcomeParty) %>%
+  summarize(count = n()) %>%
+  mutate(perOutcome = count/sum(count)) %>%
+  ungroup(.)
+
+#case outcome by representation for tenant
+outcomeRep <- courtobs %>%
+  filter(!is.na(jpCourt)) %>%
+  filter(defRep == "Yes, an attorney was present for the defendant." | defRep == "No, the defendant did not have additional representation.") %>%
+  mutate(outcomeParty = ifelse(str_detect(jpRuled, "Plaintiff"), "Ruled in Favor of Landlord",
+                                          ifelse(str_detect(jpRuled, "Defendant"), "Ruled in Favor of Tenant", 
+                                                 ifelse(str_detect(jpRuled, "abated"), "Abated",
+                                                        ifelse(str_detect(jpRuled, "dismissed"), "Dismissed", jpRuled))))) %>%
+  group_by(defRep, outcomeParty) %>%
+  summarize(count = n()) %>%
+  mutate(perOutcome = count/sum(count)) %>%
+  ungroup(.)
+
+#appearing for hearing
+defAppear <- courtobs %>%
+  filter(!is.na(jpCourt),
+         defAppear != "Unknown") %>%
+  group_by(jpCourt, defAppear) %>%
+  summarize(count = n()) %>%
+  filter(count > 1) %>%
   ungroup(.) %>%
-  mutate(perPlain = resultPlaintiff/(resultDefendant+resultPlaintiff+resultOther),
-         perDef = resultDefendant/(resultDefendant+resultPlaintiff+resultOther))
+  pivot_wider(names_from = defAppear, values_from = count, values_fill = 0) %>%
+  mutate(AppearPer = Yes/(Yes+No),
+         type = "Tenant (Defendant) Appeared for Hearing")
+
+plaAppear <- courtobs %>%
+  filter(!is.na(jpCourt),
+         plaintiffDesignee != "Unknown") %>%
+  group_by(jpCourt, plaintiffDesignee) %>%
+  summarize(count = n()) %>%
+  filter(count > 1) %>%
+  ungroup(.) %>%
+  pivot_wider(names_from = plaintiffDesignee, values_from = count, values_fill = 0) %>%
+  mutate(AppearPer = Yes/(Yes+No),
+         type = "Landlord (Plaintiff Appeared for Hearing")
+
+caseAppear <- rbind(defAppear, plaAppear)
 
 #case outcomes when defendant is present for all cases observed
 defPresent <- courtobs %>%
@@ -163,18 +213,63 @@ defPresent <- courtobs %>%
 
 #case outcomes when defendant has representation for all cases observed
 defRepresent <- courtobs %>%
-  filter(!is.na(jpCourt)) %>%
-  group_by(defRep, jpRuled) %>%
+  filter(!is.na(jpCourt),
+         defAppear == "Yes") %>%
+  mutate(legalRep = ifelse(defRep == "Yes, an attorney was present for the defendant.", "Attorney present for tenant (defendant).", "No attorney present for tenant.")) %>%
+  group_by(jpCourt, legalRep) %>%
   summarize(count = n()) %>%
-  ungroup(.) %>%
-  pivot_wider(names_from = defRep, values_from = count, values_fill = 0)
+  mutate(perRep = count/sum(count)) %>%
+  ungroup(.)
+
+# notice to vacate 
+ntv <- courtobs %>%
+  filter(!is.na(noticeVacate)) %>%
+  group_by(jpCourt, noticeVacate) %>%
+  summarize(count = n()) %>%
+  mutate(perntv = count/sum(count)) %>%
+  ungroup(.)
+
+# average hearing time
+hearingtime <- courtobs %>%
+  group_by(observationDate, observer) %>%
+  arrange(timeStamp)
 
 #eviction reason
+totReason <- courtobs %>%
+  filter(!is.na(jpCourt)) %>%
+  mutate(evicClean = ifelse(str_detect(evicReason, ","), "Multiple Reasons", evicReason)) %>%
+  group_by(evicClean) %>%
+  summarize(count = n()) %>%
+  mutate(jpCourt = "Total",
+         perCases = count/sum(count)) %>%
+  ungroup(.)
+
 evicReason <- courtobs %>%
   filter(!is.na(jpCourt)) %>%
   mutate(evicClean = ifelse(str_detect(evicReason, ","), "Multiple Reasons", evicReason)) %>%
   group_by(jpCourt, evicClean) %>%
-  summarize(count = n())
+  summarize(count = n()) %>%
+  mutate(perCases = count/sum(count)) %>%
+  ungroup(.) %>%
+  rbind(., totReason)
+  
+##### Text Inputs #####
+jp11 <- jpCasesObs %>% 
+  filter(jpCourt == "1-1") %>% 
+  pull(obsCases)
+
+jp31 <- jpCasesObs %>% 
+  filter(jpCourt == "3-1") %>% 
+  pull(obsCases)
+
+jp51 <- jpCasesObs %>% 
+  filter(jpCourt == "5-1") %>% 
+  pull(obsCases)
+
+jpSum <- jp11+jp31+jp51
+
+jpPer <- jpSum/totObsCases
+
 ```
 
 # CONTEXT
@@ -182,12 +277,10 @@ evicReason <- courtobs %>%
 **Eviction has a devastating impact on families:** involuntary displacement leads to greater material
 hardship, poorer health and avoidable healthcare costs for children and their mothers, negative
 impacts on children’s academic achievement, and greater depression and parental stress. Eviction
-disproportionately impacts communities of color, and the likelihood of receiving an eviction judgment is
-highest for mothers with children.
+disproportionately impacts communities of color, and the likelihood of receiving an eviction judgment is highest for mothers with children.
 
 **Between November 1, 2022 and April 20, 2023, 18,485 evictions have been filed in Dallas County, an average of `r avgevic1` per day.**
-This represents a `r paste0(chgevic1, "%")` change over the same time period in 2022 and a `r paste0(chgevic2, "%")` change over the same
-time period in 2021. Evictions have been on the rise since the end of the CDC Eviction Moratorium in August 2021, and Dallas County realized its highest one-month filing total in at least five years in **August 2022**, with **`r formatC(highestMonth$totevic, big.mark = ",")`** evictions filed.
+This represents a `r paste0(chgevic1, "%")` change over the same time period in 2022 and a `r paste0(chgevic2, "%")` change over the same time period in 2021. Evictions have been on the rise since the end of the CDC Eviction Moratorium in August 2021, and Dallas County realized its highest one-month filing total in at least five years in **August 2022**, with **`r formatC(highestMonth$totevic, big.mark = ",")`** evictions filed.
 
 # COURT PROCESS
 
@@ -205,23 +298,312 @@ flowchart LR
 
 In spring 2021, the Child Poverty Action Lab (CPAL) launched a court observation project to collect,
 analyze, and share eviction-related data not otherwise reported publicly. Eviction docket court observation
-has been ongoing since, with the purpose of (1) improving local understanding of how eviction unfolds,
-(2) uncovering barriers/challenges for tenants and landlords, and (3) identifying ways to better support
+has been ongoing since, with the purpose of **(1)** improving local understanding of how eviction unfolds, **(2)** uncovering barriers/challenges for tenants and landlords, and **(3)** identifying ways to better support
 tenants and landlords upstream of an eviction hearing. Observation first began in Dallas County Justice
-of the Peace Court 1-1 and expanded to Dallas County Justice of the Peace Courts 3-1 and 5-1 in 2022.
+of the Peace Court 1-1, expanded to Dallas County Justice of the Peace Courts 3-1 and 5-1 in 2022, and has continued to expand in 2023.
 
 # COURT OBSERVATION PROTOCOL
 
 The court observation project is powered by volunteer observers who attend eviction dockets in-person,
 take notes as eviction cases are heard, and then enter the data digitally for CPAL analysis. Since late
 2021, volunteer observers have all been SMU Dedman School of Law students, primarily in their second
-or third year of law school, volunteering as part of a class requirement or to fulfill public service hours.
-CPAL staff on-board volunteer observers through a two-part training: the first is an introductory online
-session to explain the eviction process, and the second is an onsite session at a Justice of the Peace
-court focused on data collection through observation.
+or third year of law school, volunteering as part of a class requirement or to fulfill public service hours. CPAL staff on-board volunteer observers through a two-part training: the first is an introductory online session to explain the eviction process, and the second is an onsite session at a Justice of the Peace court focused on data collection through observation.
 
 Once trained, volunteers sign-up for dockets to observe using a digital scheduler. Volunteers select
 dockets to observe based on their availability, so observed cases do not represent a random selection.
 During docket observations, volunteers take notes on cases heard using a paper template and then enter
 the data afterwards into a Google Form created and managed by CPAL. Before analysis and reporting,
 CPAL reviews and cleans the data, as needed.
+
+# SUMMER 2023 FINDINGS
+
+From `r format(startDate, "%B %d, %Y")` through `r format(endDate, "%B %d, %Y")`, `r smuStudents` SMU Law student volunteers observed
+`r formattable::comma(totObsCases, digits = 0)` cases: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
+3-1, and `r formattable::comma(jp51, digits = 0)` in Justice of the Peace Court 5-1. The `r formattable::comma(totObsCases, digits = 0)` observed cases represent `r paste0(jpCasesCty$perAllCases*100, "%") `
+coverage of all initially scheduled hearings in 1-1, 3-1, and 5-1.
+
+```{r, Cases Chart}
+#| fig-height: 3
+
+plotCases <- jpCasesObs %>%
+  filter(!is.na(jpCourt) & obsCases > 1) %>%
+  select(jpCourt, perAllCases) %>%
+  mutate(perAntCases = 1-perAllCases) %>%
+  pivot_longer(cols = c("perAllCases", "perAntCases")) %>%
+  rename(perCases = value) %>%
+  mutate(type = ifelse(name == "perAllCases", "Observed", "Not Observed")) %>%
+  select(-name) %>%
+  ggplot(aes(x = "", y = perCases, fill = type)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = ifelse(perCases >= 0.15, paste0(round(perCases*100, digits = 0), "%"), ""), x = 1.1),
+            position = position_stack(vjust = 0.5),
+            fontface = "bold") +
+  coord_polar(theta = "y") +
+  theme_cpal_map(scale = "discrete") +
+  facet_grid(~jpCourt) +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(title = "Percent of All Cases Observed by JP Court")
+
+cpal_plot(plotCases, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(30, 1))
+
+```
+
+```{r, Cases Table}
+jpCasesObs %>%
+  select(jpCourt, obsCases, totEvic) %>%
+  pivot_longer(cols = -jpCourt, names_to = "type") %>%
+  pivot_wider(names_from = jpCourt, values_from = value) %>%
+  mutate(type = ifelse(type == "obsCases", "CASES OBSERVED",
+                       ifelse(type == "totEvic", "SCHEDULED HEARINGS*", "ERROR"))) %>%
+  datatable(options = list(paging = FALSE,
+                           searching = FALSE,
+                           info = FALSE
+                           ),
+            rownames = FALSE,
+            colnames = c("", "1-1", "1-2", "3-1", "4-1", "5-1", "Total")) %>%
+  formatCurrency(c("1-1", "1-2", "3-1","4-1", "5-1", "Total"),
+                 interval = 3,
+                 mark = ",",
+                 currency = "",
+                 digits = 0) %>%
+  formatStyle(columns = c("type"), fontWeight = 'bold', `text-align` = 'left') %>%
+  formatStyle(columns = colnames(.), fontFamily = "Poppins")
+```
+
+> *The scheduled hearings indicator was calculated based on the hearing date set at the time of the eviction filing. If a hearing date was subsequently rescheduled for a date later than August 5, then the case is still included here in the ‘scheduled hearings’ count. Some scheduled hearings may have been dismissed in advance of the docket, so ‘coverage’ here is likely an underrepresentation of cases observed relative to the number of cases heard during a docket.
+
+## Across the `r formattable::comma(totObsCases, digits = 0)` observed cases, we found:
+
+```{r, Cases by Reason}
+#| fig-height: 3
+plotReason <- evicReason %>%
+  mutate(evicClean = factor(evicClean, levels = c("Non-payment of rent", "Violated lease", "Holdover/lease expiration", "Multiple Reasons", "Unknown"))) %>%
+  ggplot(aes(x = "", fill=evicClean, y=perCases)) + 
+  geom_bar(stat="identity") +
+  geom_text(aes(label = ifelse(perCases >= 0.15, paste0(round(perCases*100, digits = 0), "%"), ""), x = 1.1),
+            position = position_stack(vjust = 0.5),
+            fontface = "bold") +
+  coord_polar(theta = "y") +
+  facet_grid(~jpCourt) +
+  theme_cpal_map(scale = "discrete") +
+  facet_grid(~jpCourt) +
+  scale_fill_manual(values = palette_cpal_main)
+
+cpal_plot(zeroGrob(),
+          cpal_title("Reason for Eviction Case Filing by Court"),
+          plotReason, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+
+```
+
+> *The reason for an eviction case might be unknown if a default judgment was awarded to a landlord and the facts of the case were not discussed. Reasons are rounded to the nearest whole number, so totals may not equal 100%.
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: In Dallas County, millions of dollars for rent relief have been available throughout the
+pandemic. Eviction cases due to nonpayment of rent might have been remedied had the renter and landlord
+been aware of and able to easily access rent relief programs.
+
+```{r, Representation for Cases}
+#| fig-height: 5
+
+plotAppear <- caseAppear %>%
+  ggplot(aes(x = type, y = AppearPer, fill = type)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(round(AppearPer*100, digits = 0), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            fontface = "bold") +
+  facet_grid(~jpCourt) +
+  theme_cpal_print() +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "") +
+  remove_axis(axis = "x") +
+  remove_ticks()
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Landlords or their representatives almost always appeared for the hearing, but tenants appeared less than half the time.",
+                     width = 75),
+          plotAppear, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+```
+
+> *In fall 2022, volunteers observed in Justice of the Peace Court 1-1. The arrow here shows change from fall 2022 data collection. E.g., in summer 2023, tenants appeared 48% of the time in JP 1-1, but in fall 2022, tenants appeared 59% of the time.
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: When a tenant does not appear for an eviction hearing, a default judgment is usually awarded to the landlord, without consideration of the facts of the case. Tenants may not appear in court because they must go to work, lack transportation, are unclear about how eviction cases proceed, or have already determined to move out.
+
+```{r, Legal Representation Tenants}
+plotDef <- defRepresent %>%
+  ggplot(aes(x = legalRep, y = perRep, fill = legalRep)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = ifelse(perRep >= 0.2, paste0(round(perRep*100, digits = 0), "%"), "")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            fontface = "bold") +
+  facet_grid(~jpCourt) +
+  theme_cpal_print() +
+  scale_y_continuous(labels = scales::percent) +
+    scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "") +
+  remove_axis(axis = "x") +
+  remove_ticks()
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Tenants rarely had legal representation.",
+                     width = 75),
+          plotDef, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+```
+
+> *In Spring 2023 in JP 1-1, tenants had legal representation XX% of the time.
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: : Unlike criminal cases, defendants in civil cases generally do not have a right to counsel
+and are not assigned a public defender to represent them in court. As a result, very few tenants in eviction cases have legal representation and must defend themselves. Renters with legal representation in eviction hearings are much more likely to win their case and remain housed. Attorneys may also help renters negotiate terms with their landlords, keep eviction judgments off their records, and navigate other housing
+supports, like rent relief.
+
+```{r, notice to vacate}
+plotntv <- ntv %>%
+  filter(jpCourt != "5-2",
+         noticeVacate == "Yes") %>%
+  ggplot(aes(x = noticeVacate, y = perntv)) +
+    geom_bar(stat = "identity",
+             fill = "#008097") +
+    geom_text(aes(label = paste0(round(perntv*100, digits = 0), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white",
+            fontface = "bold") +
+
+    facet_grid(~jpCourt) +
+  theme_cpal_print() +
+  scale_y_continuous(labels = scales::percent) +
+#  labs(title = "Tenants rarely had legal representation.") +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "") +
+  remove_axis(axis = "x") +
+  remove_ticks()
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Tenants rarely had legal representation.",
+                     width = 75),
+          plotntv, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+
+```
+
+> *In Spring 2023 in JP 1-1, a Notice to Vacate was confirmed XX% of the time.
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Unless a lease agreement states otherwise, Texas law requires a landlord to give a renter at least three days to move out, and the landlord must provide this notice (called a Notice to Vacate) in writing. An eviction cannot be filed in court before providing a Notice to Vacate. If a Notice to Vacate was not properly administered, then the renter may have recourse to have the case dismissed. If the Notice to Vacate is not confirmed during an eviction hearing, then there may be a missed opportunity to dismiss the eviction suit.
+
+**TABLE OF AVERAGE HEARING TIMES**
+
+> Average hearing length calculated by (1) counting the number of cases observed in each docket, including default judgments, (2) calculating the total time of the docket (end time - start time), (3) calculating the average length of each hearing by dividing docket time by number of cases observed, and then (4) calculating a weighted average across all observed dockets. Because not all cases in a single docket may have been
+observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
+
+```{r, eviction outcome}
+#| fig-height: 3
+
+plotOutcome <- caseOutcome %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Other", "Unknown", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant"))) %>%
+  ggplot(aes(x = "", fill=outcomeParty, y=perOutcome)) + 
+  geom_bar(stat="identity") +
+  geom_text(aes(label = ifelse(perOutcome >= 0.15, paste0(round(perOutcome*100, digits = 0), "%"), ""), x = 1.1),
+            position = position_stack(vjust = 0.5),
+            fontface = "bold") +
+  coord_polar(theta = "y") +
+  facet_grid(~jpCourt) +
+  theme_cpal_map(scale = "discrete") +
+  labs(title = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in
+favor of the tenant in YY% of cases.") %>%
+    scale_fill_manual(values = palette_cpal_main)
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Across all observed cases, the judge ruled in favor of the landlord in XX% of cases and in favor of the tenant in YY% of cases.",
+                     width = 75),
+          plotOutcome, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+```
+
+> Outcomes are rounded to the nearest whole number, so totals may not equal 100%.
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: 
+
+> Outcomes are rounded to the nearest whole number, so totals may not equal 100%
+
+{{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Evicted low-income renters face a host of consequences: eviction increases the risk of homelessness, elevates long-term residential instability, and increases emergency room use. Eviction is also a matter of public record and can appear on public consumer reports (even if a renter won an eviction case), so evicted renters have a harder time finding a new place to live. Rent or court fees may also go to collections, negatively impacting a renter’s credit score.
+
+## However, appearing in court and having legal representation matters for outcomes.When tenants appeared for their hearings, cases were decided in favor of the landlord 52% of the time.
+
+```{r, outcomes with appearance}
+#| fig-height: 4
+
+plotOutAp <- outcomeApp %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Other", "Unknown", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant"))) %>%
+  ggplot(aes(x = defAppear, fill=outcomeParty, y=perOutcome)) + 
+  geom_bar(stat="identity", width = 0.7) +
+  geom_text(aes(label = ifelse(perOutcome >= 0.10, paste0(round(perOutcome*100, digits = 0), "%"), "")),
+            fontface = "bold",
+            position = position_stack(vjust = 0.5)) +
+  theme_cpal_print() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "")
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Case outcomes when tenant/defendant appeared versus when tenant/defendant did not
+appear (across all observations).",
+                     width = 75),
+          plotOutAp, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+```
+
+## When tenants had legal representation, cases were decided in favor of the landlord 7% of the time.
+
+```{r, outcomes with representation}
+#| fig-height: 4
+
+plotRep <- outcomeRep %>%
+  mutate(outcomeParty = factor(outcomeParty, levels = c("Abated", "Dismissed", "Other", "Unknown", "Ruled in Favor of Landlord", "Ruled in Favor of Tenant")),
+         defRep = ifelse(str_detect(defRep, "Yes"), "Yes", "No")) %>%
+  ggplot(aes(x = defRep, fill=outcomeParty, y=perOutcome)) + 
+  geom_bar(stat="identity", width = 0.7) +
+  geom_text(aes(label = ifelse(perOutcome >= 0.05, paste0(round(perOutcome*100, digits = 0), "%"), "")),
+            fontface = "bold",
+            position = position_stack(vjust = 0.5)) +
+  theme_cpal_print() +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  scale_fill_manual(values = palette_cpal_main) +
+  labs(x = "",
+       y = "")
+
+cpal_plot(zeroGrob(),
+          cpal_title(string = "Case outcomes when tenant/defendant had legal representation versus whentenant/defendant did not have legal representation (across all observations).",
+                     width = 75),
+          plotRep, 
+          cpal_logo_text(), 
+          ncol = 1,
+          heights = c(1, 3, 30, 1))
+```
+
+# ABOUT CPAL
+CPAL is a Dallas-based nonprofit organization committed to cutting child poverty in
+Dallas, Texas in half within a generation by (1) generating relevant data insights to break big problems into small, actionable ones, (2) facilitating cross-sector, collective action based on data insights, and (3) applying principles of human-centered design to solve problems in partnership with communities. One of CPAL’s five areas of focus is housing, and CPAL’s long-term aspiration is to ensure all Dallas families have access to stable housing without worry of an involuntary move.
