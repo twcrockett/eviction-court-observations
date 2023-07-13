@@ -329,13 +329,22 @@ This represents a `r paste0(chgevic1, "%")` change over the same time period in 
 # COURT PROCESS
 
 ```{mermaid}
-flowchart LR
-  A[Eviction Filed by Landlord] --> B(Tenant Receives Notice)
-  B --> C{Case Date within X days}
-  C --> D[Hearing Held]
-  D --> E[Case Outcome]
-  E --> F{Filed in Favor of Landlord}
-  E --> G{Filed in Favor of Tenant}
+%%| fig-responsive: false
+
+flowchart TD
+  A[Tenant receives written Notice to Vacate.] --> B[Tenant given at least 3 days to move out of rental.];
+  B --> C[Tenant moves out of rental. or resolves issue with landlord.];
+  B --> D(Tenant is unable to leave rental. within time frame dictated by Notice to Vacate.);
+  D --> E[Landlord files eviction suit with their local JP Precinct.];
+  E --> F[Case is heard at JP court at least 10 days after eviction filing is made.];
+  F --> G[Eviction Judgement: Case is Abated.];
+  F --> H[Eviction Judgement: Case is Dismissed.];
+  F --> I[Eviction Judgement: Case is ruled in favor of Landlord.];
+  F --> J[Eviction Judgement: Case is ruled in favor of Tenant.];
+  F --> K[Eviction Judgement: Other Outcome.];
+  G --> F;
+  J & K --> L[Appeal is filed by either party]
+  I --> M[Writ of Possession is given to landlord by Judge and constable must post a 24 hour notice before 'executing the writ' and removing the tenant's property from the rental.]
 ```
 
 # PROJECT BACKGROUND
