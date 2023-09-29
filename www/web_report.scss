@@ -16,8 +16,8 @@ $gray-400: #6aacb8 !default;
 $gray-500: #449cac !default;
 $gray-600: #2690a3 !default;
 $gray-700: #008097 !default;
-$gray-800: #006274 !default;
-$gray-900: #005160 !default;
+$gray-800: #005160 !default;
+$gray-900: #042D33 !default;
 $black:    #2f2f2f !default;
 
 $blue:    #325d88 !default;
@@ -28,13 +28,13 @@ $red:     #971700 !default;
 $orange:  #E98816 !default;
 $yellow:  #ffbe0b !default;
 $green:   #009763 !default;
-$teal:    #008097 !default;
-$cyan:    #ff006e !default;
+$teal:    #042D33 !default;
+$cyan:    #008097 !default;
 
 $primary:       $teal !default;
 $secondary:     $gray-600 !default;
 $success:       $green !default;
-$info:          $cyan !default;
+$info:          $teal !default;
 $warning:       $orange !default;
 $danger:        $red !default;
 $light:         $gray-200 !default;
@@ -44,7 +44,7 @@ $min-contrast-ratio:   2 !default;
 
 // Body
 
-$body-color:                $black !default;
+$body-color:                $gray-800 !default;
 
 // Links
 
@@ -140,16 +140,3 @@ $breadcrumb-border-radius:          .25rem !default;
 $btn-close-color:            $white !default;
 $btn-close-opacity:          .8 !default;
 $btn-close-hover-opacity:    1 !default;
-
-// Title Block
-.quarto-title-block {
-	.quarto-title-banner {
-		background-image: url(www/images/CPAL_Logo_White.png);
-	background-size: 75px;
-	background-position: left;
-	background-repeat: no-repeat;
-	padding-left: 20px;
-	background-origin: content-box;
-}
-
-}
