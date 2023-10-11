@@ -1,12 +1,5 @@
 ---
 title: "Dallas County Eviction Court Observation"
-title-block-banner: TRUE
-fig-dpi: 300
-fig-width: 7
-warning: FALSE
-error: TRUE
-echo: FALSE
-message: FALSE
 ---
 
 ```{r, Data Inputs}
@@ -316,8 +309,6 @@ jpPer <- jpSum/totObsCases
 
 ```
 
-# CONTEXT
-
 **Eviction has a devastating impact on families:** involuntary displacement leads to greater material
 hardship, poorer health and avoidable healthcare costs for children and their mothers, negative
 impacts on children’s academic achievement, and greater depression and parental stress. Eviction
@@ -326,11 +317,11 @@ disproportionately impacts communities of color, and the likelihood of receiving
 **Between November 1, 2022 and April 20, 2023, 18,485 evictions were filed in Dallas County, an average of `r avgevic1` per day.**
 This represents a `r paste0(chgevic1, "%")` change over this same time period in 2022 and a `r paste0(chgevic2, "%")` change over the same time period in 2021. Evictions have been on the rise since the end of the CDC Eviction Moratorium in August 2021, and Dallas County realized its highest one-month filing total in at least five years in **`r paste(month.name[highestMonth$monthFiled], highestMonth$yearFiled)`**, with **`r formatC(highestMonth$totevic, big.mark = ",")`** evictions filed.
 
-# COURT PROCESS
+# Eviction Court Observation Process
 
 ```{mermaid}
 flowchart TD
-  A(Tenant receives written Notice to Vacate.) --> B(Tenant given 1 or more days to move out <br>of rental depending on lease agreement.)
+  A(Tenant receives written Notice to Vacate.) --> B(Tenant given 1 or more days to move out <br>of rental depending on lease agreement.);
   B --> C{{Tenant moves out of rental or <br>resolves issue with the landlord.}}
   B ----> D(Tenant does not leave rental within <br>time frame dictated by Notice to Vacate.)
   D --> E(Landlord files eviction suit with <br>their local JP Precinct.)
@@ -349,7 +340,7 @@ flowchart TD
   Q --> R{{Constable executes writ and begins removing the tenant's property.}}
 ```
 
-# PROJECT BACKGROUND
+# Project Background
 
 In spring 2021, the Child Poverty Action Lab (CPAL) launched a court observation project to collect,
 analyze, and share eviction-related data not otherwise reported publicly. Eviction docket court observation
@@ -357,7 +348,7 @@ has been ongoing since, with the purpose of **(1)** improving local understandin
 tenants and landlords upstream of an eviction hearing. Observation first began in Dallas County Justice
 of the Peace Court 1-1, expanded to Dallas County Justice of the Peace Courts 3-1 and 5-1 in 2022, and has continued to expand in 2023.
 
-# OBSERVATION PROTOCOL
+# Case Observation Protocol
 
 The court observation project is powered by volunteer observers who attend eviction dockets in-person,
 take notes as eviction cases are heard, and then enter the data digitally for CPAL analysis. Since late
@@ -370,7 +361,7 @@ During docket observations, volunteers take notes on cases heard using a paper t
 the data afterwards into a Google Form created and managed by CPAL. Before analysis and reporting,
 CPAL reviews and cleans the data, as needed.
 
-# FINDINGS
+# Case Observation Findings
 
 From `r format(startDate, "%B %d, %Y")` through `r format(endDate, "%B %d, %Y")`, `r smuStudents` SMU Law student volunteers observed
 **`r formattable::comma(totObsCases, digits = 0)` cases**: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
@@ -436,9 +427,11 @@ jpCasesObs %>%
 ```
 
 
-> *The scheduled hearings indicator was calculated based on the hearing date set at the time of the eviction filing. If a hearing date was subsequently rescheduled for a date later than April 20, then the case is still included here in the ‘scheduled hearings’ count. Some scheduled hearings may have been dismissed in advance of the docket, so ‘coverage’ here is likely an underrepresentation of cases observed relative to the number of cases heard during a docket.
+:::{.column-margin}
+*The scheduled hearings indicator was calculated based on the hearing date set at the time of the eviction filing. If a hearing date was subsequently rescheduled for a date later than April 20, then the case is still included here in the ‘scheduled hearings’ count. Some scheduled hearings may have been dismissed in advance of the docket, so ‘coverage’ here is likely an underrepresentation of cases observed relative to the number of cases heard during a docket.
+:::
 
-## Across the `r formattable::comma(totObsCases, digits = 0)` observed cases, we found:
+### Across the `r formattable::comma(totObsCases, digits = 0)` observed cases, we found:
 
 ```{r, Cases by Reason}
 #| fig-height: 3
@@ -472,9 +465,13 @@ cpal_plot(zeroGrob(),
 ```
 
 
-> *The reason for an eviction case might be unknown if a default judgment was awarded to a landlord and the facts of the case were not discussed. Reasons are rounded to the nearest whole number, so totals may not equal 100%.
+:::{.column-margin}
+*The reason for an eviction case might be unknown if a default judgment was awarded to a landlord and the facts of the case were not discussed. Reasons are rounded to the nearest whole number, so totals may not equal 100%.
+:::
 
+:::{.shadecontent}
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Millions of dollars in federal rent relief have largely been expended at this time, but eviction filing data illustrates the ongoing need for financial assistance to renters who have fallen behind on rent.
+:::
 
 ```{r, Representation for Cases}
 #| fig-height: 5
@@ -508,7 +505,9 @@ cpal_plot(zeroGrob(),
           heights = c(1, 3, 30, 2))
 ```
 
+:::{.shadecontent}
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: When a tenant does not appear for an eviction hearing, a default judgment is usually awarded to the landlord, without consideration of the facts of the case. Tenants may not appear in court because they must go to work, lack transportation, are unclear about how eviction cases proceed, or have already determined to move out.
+:::
 
 ```{r, Legal Representation Tenants}
 plotDef <- defRepresent %>%
@@ -540,11 +539,15 @@ cpal_plot(zeroGrob(),
           heights = c(1, 3, 30, 2))
 ```
 
-> *In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, 10% of tenants had legal representation. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, 25% of tenants had legal representation. 
+:::{.column-margin}
+*In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, 10% of tenants had legal representation. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, 25% of tenants had legal representation. 
+:::
 
+:::{.shadecontent}
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: : Unlike criminal cases, defendants in civil cases generally do not have a right to counsel
 and are not assigned a public defender to represent them in court. As a result, very few tenants in eviction cases have legal representation and must defend themselves. Renters with legal representation in eviction hearings are much more likely to win their case and remain housed. Attorneys may also help renters negotiate terms with their landlords, keep eviction judgments off their records, and navigate other housing
 supports, like rent relief.
+:::
 
 ```{r, notice to vacate}
 plotntv <- ntv %>%
@@ -579,11 +582,15 @@ cpal_plot(zeroGrob(),
 
 ```
 
-> *In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, a Notice to Vacate was confirmed 33% of the time. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, a Notice to Vacate was confirmed 45% of the time.
+:::{.column-margin}
+*In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, a Notice to Vacate was confirmed 33% of the time. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, a Notice to Vacate was confirmed 45% of the time.
+:::
 
+:::{.shadecontent}
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Unless a lease agreement states otherwise, Texas law requires a landlord to give a renter at least three days to move out, and the landlord must provide this notice (called a Notice to Vacate) in writing. An eviction cannot be filed in court before providing a Notice to Vacate. If a Notice to Vacate was not properly administered, then the renter may have recourse to have the case dismissed. If the Notice to Vacate is not confirmed during an eviction hearing, then there may be a missed opportunity to dismiss the eviction suit.
+:::
 
-## Across all cases, the average length of time for each hearing was less than 4 minutes.
+### Across all cases, the average length of time for each hearing was less than 4 minutes.
 
 ```{r, Average Hearing Time}
 hearingtime %>%
@@ -599,10 +606,12 @@ hearingtime %>%
   formatStyle(columns = colnames(.), fontFamily = "Poppins")
 ```
 
-> Average hearing length calculated by (1) counting the number of cases observed in each docket, including default judgments, (2) calculating the total time of the docket (end time - start time), (3) calculating the average length of each hearing by dividing docket time by number of cases observed, and then (4) calculating a weighted average across all observed dockets. Because not all cases in a single docket may have been observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
+:::{.column-margin}
+Average hearing length calculated by (1) counting the number of cases observed in each docket, including default judgments, (2) calculating the total time of the docket (end time - start time), (3) calculating the average length of each hearing by dividing docket time by number of cases observed, and then (4) calculating a weighted average across all observed dockets. Because not all cases in a single docket may have been observed, average length of time here is likely conservative – i.e., average length of time per hearing is likely an overestimate.
+:::
 
 ```{r, eviction outcome}
-#| fig-height: 3
+#| fig-height: 4
 
 plotOutcome <- caseOutcome %>%
   mutate(outcomeParty = factor(outcomeParty, levels = c("Ruled in Favor of Landlord", "Ruled in Favor of Tenant", "Abated", "Dismissed", "Other", "Unknown"))) %>%
@@ -629,12 +638,16 @@ cpal_plot(zeroGrob(),
           heights = c(1, 3, 30, 2))
 ```
 
-> Outcomes are rounded to the nearest whole number, so totals may not equal 100%.
-> In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, the judge ruled in favor of the landlord in 72% of cases and in favor of the tenant in 3% of cases. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, the judge ruled in favor of the landlord in 58% of cases and in favor of the tenant in 5% of cases.
+:::{.column-margin}
+Outcomes are rounded to the nearest whole number, so totals may not equal 100%.
+In Summer 2022 across JP Courts 1-1, 3-1, and 5-1, the judge ruled in favor of the landlord in 72% of cases and in favor of the tenant in 3% of cases. In Spring 2023 across JP Courts 1-1, 3-1, and 5-1, the judge ruled in favor of the landlord in 58% of cases and in favor of the tenant in 5% of cases.
+:::
 
+:::{.shadecontent}
 {{< fa house-chimney size=lg title="Housing" >}} **Why this matters**: Evicted low-income renters face a host of consequences: eviction increases the risk of homelessness, elevates long-term residential instability, and increases emergency room use. Eviction is also a matter of public record and can appear on public consumer reports (even if a renter won an eviction case), so evicted renters have a harder time finding a new place to live. Rent or court fees may also go to collections, negatively impacting a renter’s credit score.
+:::
 
-## However, appearing in court and having legal representation matters for outcomes. When tenants appeared for their hearings, cases were decided in favor of the landlord 53% of the time.
+### However, appearing in court and having legal representation matters for outcomes. When tenants appeared for their hearings, cases were decided in favor of the landlord 53% of the time.
 
 ```{r, outcomes with appearance}
 #| fig-height: 4
@@ -667,7 +680,7 @@ appear (across all observations).",
           heights = c(1, 3, 30, 2))
 ```
 
-## When tenants had legal representation, cases were decided in favor of the landlord 7% of the time.
+### When tenants had legal representation, cases were decided in favor of the landlord 7% of the time.
 
 ```{r, outcomes with representation}
 #| fig-height: 4
@@ -699,6 +712,6 @@ cpal_plot(zeroGrob(),
           heights = c(1, 3, 30, 2))
 ```
 
-# ABOUT CPAL
+# About CPAL
 CPAL is a Dallas-based nonprofit organization committed to cutting child poverty in
 Dallas, Texas in half within a generation by (1) generating relevant data insights to break big problems into small, actionable ones, (2) facilitating cross-sector, collective action based on data insights, and (3) applying principles of human-centered design to solve problems in partnership with communities. One of CPAL’s five areas of focus is housing, and CPAL’s long-term aspiration is to ensure all Dallas families have access to stable housing without worry of an involuntary move.
