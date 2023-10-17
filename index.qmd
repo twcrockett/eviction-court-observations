@@ -292,15 +292,23 @@ evicReason <- courtobs %>%
   
 ##### Text Inputs #####
 jp11 <- jpCasesObs %>% 
-  filter(jpCourt == "1-1") %>% 
+  filter(jpCourt == "Court 1-1") %>% 
+  pull(obsCases)
+
+jp12 <- jpCasesObs %>% 
+  filter(jpCourt == "Court 1-2") %>% 
   pull(obsCases)
 
 jp31 <- jpCasesObs %>% 
-  filter(jpCourt == "3-1") %>% 
+  filter(jpCourt == "Court 3-1") %>% 
+  pull(obsCases)
+
+jp41 <- jpCasesObs %>% 
+  filter(jpCourt == "Court 4-1") %>% 
   pull(obsCases)
 
 jp51 <- jpCasesObs %>% 
-  filter(jpCourt == "5-1") %>% 
+  filter(jpCourt == "Court 5-1") %>% 
   pull(obsCases)
 
 jpSum <- jp11+jp31+jp51
@@ -366,8 +374,8 @@ CPAL reviews and cleans the data, as needed.
 # Case Observation Findings
 
 From `r format(startDate, "%B %d, %Y")` through `r format(endDate, "%B %d, %Y")`, `r smuStudents` SMU Law student volunteers observed
-**`r formattable::comma(totObsCases, digits = 0)` cases**: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
-3-1, and `r formattable::comma(jp51, digits = 0)` in Justice of the Peace Court 5-1. The `r formattable::comma(totObsCases, digits = 0)` observed cases represent **`r paste0(jpCasesCty$perAllCases*100, "% coverage")`** of all initially scheduled hearings in 1-1, 3-1, and 5-1. Student volunteers expanded to JP Court 1-2 and 4-1 for the first time in Spring 2023, hence the lower coverage rate.
+**`r formattable::comma(totObsCases, digits = 0)` cases**: `r formattable::comma(jp11, digits = 0)` in Justice of the Peace Court 1-1, `r formattable::comma(jp12, digits = 0)` in Justice of the Peace Court 1-2, `r formattable::comma(jp31, digits = 0)` in Justice of the Peace Court
+3-1, `r formattable::comma(jp41, digits = 0)` in Justice of the Peace Court 4-1, and `r formattable::comma(jp51, digits = 0)` in Justice of the Peace Court 5-1. The `r formattable::comma(totObsCases, digits = 0)` observed cases represent **`r paste0(jpCasesCty$perAllCases*100, "% coverage")`** of all initially scheduled hearings in 1-1, 3-1, and 5-1. Student volunteers expanded to JP Court 1-2 and 4-1 for the first time in Spring 2023, hence the lower coverage rate.
 
 ```{r, Cases Chart}
 #| fig-height: 4
