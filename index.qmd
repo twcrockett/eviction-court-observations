@@ -14,9 +14,11 @@ library(DT)
 library(grid)
 library(gridExtra)
 
-libDB <- "C:/Users/Michael/CPAL Dropbox/"
+# libDB <- "C:/Users/Michael/CPAL Dropbox/"
+libDB <- "C:/Users/taylo/CPAL Dropbox/"
 
-googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
+# googlesheets4::gs4_auth(email = "michael@childpovertyactionlab.org")
+googlesheets4::gs4_auth(email = "taylor@childpovertyactionlab.org")
 
 courtobs <- read_sheet(ss = "https://docs.google.com/spreadsheets/d/1O9P06SgvZ_nRGc64W2OsSjyX9iCS_LkcsG9087HNTuk",
                                sheet = "Form Responses 1") %>%
@@ -421,6 +423,43 @@ cpal_plot(zeroGrob(),
 ```
 
 ```{r, Cases Table}
+CPAL_datatable <- function(
+    data,
+    format = 1,
+    total_row = FALSE, 
+    rownames = FALSE, 
+    feature_desc = FALSE, 
+    datatable_options = list(
+      paging = FALSE,
+      searching = FALSE,
+      info = FALSE
+    ), ...) {
+  
+  # Render the DataTable
+  dt <- datatable(
+    data, 
+    class = list(stripe = FALSE, paste0("format-", format)),
+    options = datatable_options,
+    rownames = rownames
+  )
+  
+  if (total_row) {
+    dt <- formatStyle(dt,
+                      columns = 1:ncol(data),
+                      target = "row", 
+                      backgroundColor = styleEqual(nrow(data), "rgba(4, 45, 51, 0.5)"))
+  }
+  
+  if (feature_desc) {
+    dt <- formatStyle(dt, 
+                      columns = 1, 
+                      width = "30%")
+  }
+  
+  return(dt)
+}
+
+
 jpCasesObs %>%
   ungroup(.) %>%
   transmute('JP Court' = jpCourt,
@@ -428,13 +467,19 @@ jpCasesObs %>%
             'Share of Total Observed Cases (%)' = scales::percent(perObsCases, accuracy = 0.1),
             'Scheduled Hearings*' = scales::number(totEvic, big.mark = ","),
             'Observed Cases by Court (%)' = scales::percent(perAllCases, accuracy = 0.1)) %>%
-    datatable(options = list(paging = FALSE,
-                           searching = FALSE,
-                           info = FALSE
-                           ),
-            rownames = FALSE) %>%
-  formatStyle(columns = colnames(.), fontWeight = 'bold', `text-align` = 'left') %>%
-  formatStyle(columns = colnames(.), fontFamily = "Poppins")
+    CPAL_datatable(total_row = TRUE, feature_desc = TRUE)
+
+jpCasesObs %>%
+  ungroup(.) %>%
+  transmute('JP Court' = jpCourt,
+            'Observed Cases' = scales::number(obsCases, big.mark = ","),
+            'Share of Total Observed Cases (%)' = scales::percent(perObsCases, accuracy = 0.1),
+            'Scheduled Hearings*' = scales::number(totEvic, big.mark = ","),
+            'Observed Cases by Court (%)' = scales::percent(perAllCases, accuracy = 0.1)) %>%
+    CPAL_datatable(total_row = TRUE, feature_desc = TRUE, format = 2)
+# %>%
+#   formatStyle(columns = colnames(.), fontWeight = 'bold', `text-align` = 'left') %>%
+#   formatStyle(columns = colnames(.), fontFamily = "Poppins")
 ```
 
 
